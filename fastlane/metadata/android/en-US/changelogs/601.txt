@@ -1,0 +1,7 @@
+• Fixed: your synthetic persona could stay frozen well past its 8-10 day rotation window. Rotation now catches up whenever the engine starts, instead of relying only on a background timer (#275).
+• Fixed: the last-resort fallback persona was always the same identity with the same interests, which made affected devices look alike to a broker. It is now varied (#275).
+• Fixed: Profile Drift showed "collecting…" forever if you had never imported an ad profile. It now tells you an import is needed (#275).
+• Fixed: the action log reported Success for pages that never actually loaded, so DNS-blocked sites (Pi-hole and similar) looked like successful visits (#268).
+• Fixed: a crash that stopped LAN Sync after several hours of running (#248, #249).
+• Removed bot and headless-browser User-Agents from the pool, including one that could be used for search traffic. Decoy traffic no longer identifies itself as a crawler (#274).
+• Maintenance: dependency and build updates.

@@ -1,0 +1,7 @@
+• Corrigé : votre persona synthétique pouvait rester figée bien au-delà de son cycle de rotation de 8 à 10 jours. La rotation se rattrape désormais à chaque démarrage du moteur, au lieu de dépendre uniquement d'une minuterie en arrière-plan (#275).
+• Corrigé : la persona de secours était toujours la même identité avec les mêmes centres d'intérêt, ce qui rendait les appareils concernés semblables aux yeux d'un courtier en données. Elle varie désormais (#275).
+• Corrigé : Dérive du profil affichait « collecte… » indéfiniment si vous n'aviez jamais importé de profil publicitaire. L'application indique maintenant qu'un import est nécessaire (#275).
+• Corrigé : le journal d'actions signalait comme Réussi des pages qui n'avaient jamais été chargées, si bien que les sites bloqués par DNS (Pi-hole et similaires) passaient pour des visites réussies (#268).
+• Corrigé : un plantage qui arrêtait la synchronisation LAN après plusieurs heures de fonctionnement (#248, #249).
+• Suppression des User-Agent de robots et de navigateurs headless du pool, dont un pouvait servir au trafic de recherche. Le trafic leurre ne s'identifie plus comme un robot d'indexation (#274).
+• Maintenance : mises à jour des dépendances et de la compilation.

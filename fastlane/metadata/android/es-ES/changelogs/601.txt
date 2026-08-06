@@ -1,0 +1,7 @@
+• Corregido: tu persona sintética podía quedarse congelada mucho más allá de su ciclo de rotación de 8 a 10 días. Ahora la rotación se pone al día cada vez que arranca el motor, en lugar de depender solo de un temporizador en segundo plano (#275).
+• Corregido: la persona de reserva era siempre la misma identidad con los mismos intereses, lo que hacía que los dispositivos afectados se parecieran entre sí ante un bróker de datos. Ahora varía (#275).
+• Corregido: Deriva del perfil mostraba "recopilando…" indefinidamente si nunca habías importado un perfil publicitario. Ahora indica que hace falta importarlo (#275).
+• Corregido: el registro de acciones marcaba como Correcto páginas que nunca llegaron a cargarse, por lo que los sitios bloqueados por DNS (Pi-hole y similares) parecían visitas correctas (#268).
+• Corregido: un fallo que detenía la sincronización LAN tras varias horas en marcha (#248, #249).
+• Eliminados los User-Agent de bots y navegadores headless del conjunto, incluido uno que podía usarse para el tráfico de búsqueda. El tráfico señuelo ya no se identifica como rastreador (#274).
+• Mantenimiento: actualizaciones de dependencias y compilación.
