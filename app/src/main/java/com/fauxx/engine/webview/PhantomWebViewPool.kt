@@ -77,6 +77,13 @@ class PhantomWebViewPool @Inject constructor(
     /** Per-WebView allowed-resource-request counter, reset on [acquire] (issue #73 metadata). */
     private val resourceCounters = ConcurrentHashMap<String, AtomicInteger>()
 
+    /**
+     * Issue #268: the first main-frame load error seen on each pooled WebView since [acquire],
+     * or null if the load succeeded. Mirrors [resourceCounters] — per-instance state the pool owns,
+     * reset on acquire, read by modules via [lastLoadError] to decide the action's success.
+     */
+    private val loadErrors = ConcurrentHashMap<String, AtomicReference<String?>>()
+
     /** Total renderer-process deaths recovered from (issue #210), for diagnostics. */
     private val rendererDeaths = AtomicInteger(0)
 
@@ -156,6 +163,7 @@ class PhantomWebViewPool @Inject constructor(
                 withContext(Dispatchers.Main) {
                     val wv = pool.first { acquired.putIfAbsent(it.tag as String, true) == null }
                     resourceCounters[wv.tag as String]?.set(0)
+                    loadErrors[wv.tag as String]?.set(null)
                     currentUserAgent.get()?.let { wv.settings.userAgentString = it }
                     wv
                 }
@@ -177,6 +185,28 @@ class PhantomWebViewPool @Inject constructor(
      * null out the title and reset the document. Every read is guarded; this never throws, and a
      * failed read simply omits that field so the action's success is unaffected.
      */
+    /**
+     * The first main-frame load error on [webView] since [acquire], or null if the main frame
+     * loaded cleanly (issue #268).
+     *
+     * Modules use this to decide whether an action actually succeeded. Before this existed, a load
+     * that failed at the network layer still counted as a success: the module fired `loadUrl`,
+     * dwelled, and returned true regardless, so users running a DNS blocker saw "Success" lines for
+     * pages that never loaded. Safe to call from any thread.
+     */
+    fun lastLoadError(webView: WebView): String? =
+        runCatching { loadErrors[webView.tag as? String]?.get() }.getOrNull()
+
+    /**
+     * Reset the recorded load error for [webView] (issue #268). Callers that perform SEVERAL
+     * navigations on one acquired instance (SearchPoisonModule loads a goal SERP then a chain of
+     * refinements) must call this before each one, otherwise the first failure would mark every
+     * later navigation in the session as failed too.
+     */
+    fun clearLoadError(webView: WebView) {
+        runCatching { loadErrors[webView.tag as? String]?.set(null) }
+    }
+
     fun captureMetadata(webView: WebView, url: String, vararg extra: Pair<String, String?>): String? {
         val title = runCatching {
             webView.title?.takeIf { it.isNotBlank() && it != "about:blank" }
@@ -311,11 +341,16 @@ class PhantomWebViewPool @Inject constructor(
 
         val resourceCounter = AtomicInteger(0)
         resourceCounters[tag] = resourceCounter
+        val loadError = AtomicReference<String?>(null)
+        loadErrors[tag] = loadError
         webView.webViewClient = PhantomWebViewClient(
             blocklist,
             resourceCounter = resourceCounter,
             onRenderGone = ::handleRendererGone,
             deviceProvider = { currentDevice.get() },
+            // Issue #268: record only the FIRST main-frame error of a load. A failed navigation can
+            // emit several callbacks, and the first one is the one that describes what went wrong.
+            onMainFrameError = { loadError.compareAndSet(null, it) },
         )
         webView.isClickable = false
         webView.isFocusable = false

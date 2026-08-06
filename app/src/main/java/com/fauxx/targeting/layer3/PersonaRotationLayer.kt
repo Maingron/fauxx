@@ -46,7 +46,8 @@ private const val UNIFORM_BASELINE_WEIGHT = 0.6f
 /**
  * Layer 3 of the Demographic Distancing Engine — persona rotation targeting.
  *
- * Generates a new [SyntheticPersona] every 7±3 days and returns category weights from the
+ * Generates a new [SyntheticPersona] roughly every 8-10 days (a 7-day base plus 1-3 days of
+ * jitter, re-rolled each cycle) and returns category weights from the
  * raw constants (ALIGNED 2.0 / MISALIGNED 0.3) blended at PERSONA_FOLLOW_FRACTION with
  * the uniform baseline; 1.0 (neutral) when the layer is disabled or has no persona.
  *
@@ -163,25 +164,49 @@ class PersonaRotationLayer @Inject constructor(
     /** Enable or disable this layer. */
     fun setEnabled(enabled: Boolean) {
         _enabled.value = enabled
-        if (enabled && _currentPersona.value == null) {
-            // Issue #63: `_currentPersona` was in-memory only, so the FGS resume cycle
-            // (process restarts on reboot/app-update and after long-pause resigns)
-            // caused setEnabled() to fire on a fresh process with `_currentPersona ==
-            // null`, generating a brand-new persona every restart. Users perceived
-            // "persona rotates daily" instead of weekly.
-            // Restore the most-recent still-active persona from history before falling
-            // back to generation.
-            scope.launch {
-                val restored = restoreMostRecentActivePersona()
-                if (restored != null) {
-                    _currentPersona.value = restored
-                    Timber.d(
-                        "Restored persona ${restored.name} from history (active until ${restored.activeUntil})"
-                    )
-                } else {
-                    rotatePersona()
-                }
-            }
+        if (!enabled) return
+
+        // Issue #63: `_currentPersona` was in-memory only, so the FGS resume cycle
+        // (process restarts on reboot/app-update and after long-pause resigns)
+        // caused setEnabled() to fire on a fresh process with `_currentPersona ==
+        // null`, generating a brand-new persona every restart. Users perceived
+        // "persona rotates daily" instead of weekly.
+        // Restore the most-recent still-active persona from history before falling
+        // back to generation.
+        //
+        // Issue #275: this used to run ONLY when `_currentPersona == null`, so an
+        // already-loaded but EXPIRED persona was left in place and rotation waited on
+        // the in-process [ROTATION_CHECK_INTERVAL_MS] ticker. Any engine restart that
+        // kept the process alive (pause/resume, quiet hours, the resume scheduler) was
+        // therefore a missed catch-up opportunity, and if the ticker never got to run
+        // the persona could stay frozen well past its `activeUntil`. Treating an expired
+        // persona the same as a missing one makes every engine start self-healing.
+        if (!needsPersonaRefresh()) return
+        scope.launch { ensureActivePersonaInternal() }
+    }
+
+    /** True when there is no persona loaded, or the loaded one has passed its `activeUntil`. */
+    @androidx.annotation.VisibleForTesting
+    internal fun needsPersonaRefresh(): Boolean {
+        val current = _currentPersona.value ?: return true
+        return clock.currentTimeMillis() > current.activeUntil
+    }
+
+    /**
+     * Restore-or-rotate body (internal + suspend so tests can await it deterministically,
+     * mirroring [adoptSyncedPersonaInternal]). Prefers a still-active persona from history so a
+     * process restart does not burn a rotation (#63), and only generates when none is available.
+     */
+    @androidx.annotation.VisibleForTesting
+    internal suspend fun ensureActivePersonaInternal() {
+        val restored = restoreMostRecentActivePersona()
+        if (restored != null) {
+            _currentPersona.value = restored
+            Timber.d(
+                "Restored persona ${restored.name} from history (active until ${restored.activeUntil})"
+            )
+        } else {
+            rotatePersonaInternal()
         }
     }
 
@@ -284,25 +309,33 @@ class PersonaRotationLayer @Inject constructor(
     }
 
     private fun rotatePersona(immediateAdoption: Boolean = false) {
-        scope.launch {
-            try {
-                val newPersona = generator.generate()
-                // Keep the outgoing persona so channels can phase the new one in
-                // (see personaForChannel); a user-forced rotation adopts instantly.
-                _previousPersona.value = if (immediateAdoption) null else _currentPersona.value
-                _currentPersona.value = newPersona
-                historyDao.insert(
-                    PersonaHistoryEntity(
-                        personaJson = gson.toJson(newPersona),
-                        createdAt = newPersona.createdAt
-                    )
+        scope.launch { rotatePersonaInternal(immediateAdoption) }
+    }
+
+    /**
+     * The rotation body (internal + suspend so tests can await it deterministically, mirroring
+     * [adoptSyncedPersonaInternal]). The fire-and-forget [rotatePersona] wrapper is what the
+     * expiry ticker and [rotateNow] call.
+     */
+    @androidx.annotation.VisibleForTesting
+    internal suspend fun rotatePersonaInternal(immediateAdoption: Boolean = false) {
+        try {
+            val newPersona = generator.generate()
+            // Keep the outgoing persona so channels can phase the new one in
+            // (see personaForChannel); a user-forced rotation adopts instantly.
+            _previousPersona.value = if (immediateAdoption) null else _currentPersona.value
+            _currentPersona.value = newPersona
+            historyDao.insert(
+                PersonaHistoryEntity(
+                    personaJson = gson.toJson(newPersona),
+                    createdAt = newPersona.createdAt
                 )
-                // Prune old history beyond 90 days
-                val cutoff = clock.currentTimeMillis() - HISTORY_RETENTION_MS
-                historyDao.pruneOlderThan(cutoff)
-            } catch (e: Exception) {
-                Timber.e(e, "Failed to rotate persona, falling back to neutral weights")
-            }
+            )
+            // Prune old history beyond 90 days
+            val cutoff = clock.currentTimeMillis() - HISTORY_RETENTION_MS
+            historyDao.pruneOlderThan(cutoff)
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to rotate persona, falling back to neutral weights")
         }
     }
 

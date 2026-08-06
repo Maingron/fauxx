@@ -496,6 +496,7 @@
     <string name="dashboard_drift_help">À quel point votre profil d\'intérêts publicitaires importé s\'est éloigné de votre premier import (de référence), exprimé en divergence KL. Plus la valeur est élevée, plus le mouvement est important. La dérive peut aussi refléter le réentraînement du modèle par la plateforme, pas seulement Fauxx, considérez-la donc comme un indicateur, pas une preuve.</string>
     <string name="dashboard_drift_collecting">collecte…</string>
     <string name="dashboard_drift_no_profile">aucun profil publicitaire</string>
+    <string name="dashboard_drift_not_imported">importez un profil</string>
     <string name="dashboard_control_divergence_title">EMPOISONNÉ VS CONTRÔLE</string>
     <string name="dashboard_control_divergence_help">Divergence KL entre votre profil empoisonné et un profil de contrôle importé (un compte propre que vous n\'empoisonnez jamais). Plus la valeur est élevée, plus Fauxx a éloigné les deux profils. Affiché uniquement après avoir importé un profil de contrôle.</string>
     <string name="dashboard_synthetic_activity_title">ACTIVITÉ SYNTHÉTIQUE</string>

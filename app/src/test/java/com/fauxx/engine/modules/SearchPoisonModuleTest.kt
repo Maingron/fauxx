@@ -63,7 +63,11 @@ class SearchPoisonModuleTest {
         every { getProfile().intensity } returns com.fauxx.data.model.IntensityLevel.MEDIUM
         every { getProfile().mobileIntensity } returns null
     }
-    private val webViewPool: PhantomWebViewPool = mockk(relaxed = true)
+    // #268: modules now consult lastLoadError() to decide success. A relaxed mock would hand back
+    // a non-null string, i.e. "this load failed", so the clean-load default has to be explicit.
+    private val webViewPool: PhantomWebViewPool = mockk<PhantomWebViewPool>(relaxed = true).apply {
+        every { lastLoadError(any()) } returns null
+    }
     private val userAgentPool: UserAgentPool = mockk(relaxed = true)
     private val blocklist: DomainBlocklist = mockk(relaxed = true)
     private val demographicDao: DemographicProfileDao = mockk(relaxed = true)
