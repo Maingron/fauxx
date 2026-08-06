@@ -621,6 +621,11 @@ private fun DriftCard(
                         // produce a value, so say so instead of "collecting…" forever.
                         driftState == com.fauxx.targeting.layer2.DriftState.NO_PROFILE ->
                             stringResource(R.string.dashboard_drift_no_profile)
+                        // #275: drift is computed from imported snapshots, so with no import it
+                        // never advances. Point at the action that starts it rather than implying
+                        // the user just needs to wait longer.
+                        driftState == com.fauxx.targeting.layer2.DriftState.NOT_IMPORTED ->
+                            stringResource(R.string.dashboard_drift_not_imported)
                         else -> stringResource(R.string.dashboard_drift_collecting)
                     },
                     style = MaterialTheme.typography.labelMedium,

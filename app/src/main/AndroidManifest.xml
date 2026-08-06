@@ -27,12 +27,17 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- LAN sync runs as a SHORT, user-initiated dataSync foreground session (the user is
-         on the Sync screen). dataSync's ~6h/24h cap (Android 14+) is irrelevant here: a
-         household pairing/push finishes in seconds and the service is torn down when the
-         user leaves. This is the documented FGS type for a user-initiated local data
-         transfer, distinct from the always-on engine's specialUse service. -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- LAN sync uses specialUse, like the engine (see src/full and src/play overlays, which
+         declare this permission for PhantomForegroundService).
+
+         It used to be dataSync, on the assumption that a session is short because "the service is
+         torn down when the user leaves". That was never true: nothing stops the service when the
+         user leaves the Sync screen, so it accumulated runtime, blew through dataSync's 6h/24h cap
+         (Android 15+), and the platform killed it — the ForegroundServiceDidNotStopInTimeException
+         crashes in #248/#249. specialUse has no cap, which is the same reason the engine moved to
+         it in #64/#65. dataSync was also the wrong category on its own terms: it describes moving
+         the user's data to and from the CLOUD, and this never leaves the local network. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <!-- Boot receiver -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -75,14 +80,19 @@
             android:name=".service.PhantomForegroundService"
             android:exported="false" />
 
-        <!-- Encrypted LAN persona sync session (E13 #178). A user-initiated dataSync
+        <!-- Encrypted LAN persona sync session (E13 #178). A user-initiated specialUse
              foreground service that holds the MulticastLock, advertises/browses over
              NsdManager, and runs the inbound sealed-frame listener only while the user
-             has sync enabled. Never auto-started at boot. -->
+             has sync enabled. Never auto-started at boot. See the FOREGROUND_SERVICE_SPECIAL_USE
+             comment above for why this is specialUse rather than dataSync (#248, #249). -->
         <service
             android:name=".service.SyncForegroundService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Encrypted peer-to-peer synchronization of the user's own synthetic-persona state between their paired devices, over the local network only. The session is user-initiated and never contacts a remote server, so it does not fit dataSync (defined as transferring the user's data to or from the cloud). It must hold a multicast lock and an inbound listening socket for as long as the user leaves sync enabled, because two paired devices can only converge while both are simultaneously reachable on the LAN." />
+        </service>
 
         <!-- Boot receiver -->
         <receiver

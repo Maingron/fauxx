@@ -203,17 +203,38 @@ class PersonaGenerator @Inject constructor(
         return matchCount >= MIN_DEMOGRAPHIC_MATCHES
     }
 
+    /**
+     * Last resort when every one of [MAX_ATTEMPTS] candidates was rejected — either as too similar
+     * to recent history or as a match for the user's own demographics.
+     *
+     * The demographic traits are deliberately fixed. They are the safety guarantee this fallback
+     * exists to provide: when the sampled distribution collides with the user's real profile on
+     * every attempt (see PersonaGeneratorJointSamplingTest), the generator must still emit a
+     * persona that does NOT mirror the user. A mid-range, unremarkable trio is the safe choice.
+     *
+     * The NAME and INTERESTS are randomized (issue #275). They used to be fixed too, which meant
+     * every install reaching this path converged on one identical identity ("Alex Johnson", always
+     * COOKING/TRAVEL/FITNESS). That is a cross-user correlation tell — a broker seeing that exact
+     * interest triple could bucket Fauxx users together, the precise opposite of what rotation is
+     * for — and it read to the user as "rotation stopped", since the displayed name never changed
+     * again. Interests also drive the Layer 3 category weights, so a constant set meant constant
+     * targeting.
+     *
+     * Residual, accepted for now: the three demographic traits are still shared across every
+     * fallback persona. That is a far weaker signal than the full identity, and it is load-bearing
+     * for the guarantee above. Measured reach of this path is ~0% (EN) to ~0.2% (ru) of rotations.
+     */
     private fun buildFallbackPersona(): SyntheticPersona {
         val now = clock.currentTimeMillis()
         return SyntheticPersona(
             id = UUID.randomUUID().toString(),
-            name = "Alex Johnson",
+            name = generateName(),
             ageRange = AgeRange.AGE_35_44.name,
             profession = Profession.OTHER.name,
             region = "US_MIDWEST",
-            interests = setOf(CategoryPool.COOKING, CategoryPool.TRAVEL, CategoryPool.FITNESS),
+            interests = selectInterests(template = null, weightHints = emptyMap()),
             createdAt = now,
-            activeUntil = now + TimeUnit.DAYS.toMillis(7)
+            activeUntil = nextRotationTime()
         )
     }
 

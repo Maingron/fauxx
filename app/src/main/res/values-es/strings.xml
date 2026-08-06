@@ -496,6 +496,7 @@
     <string name="dashboard_drift_help">Cuánto se ha alejado tu perfil de intereses publicitarios importado desde la primera importación (de referencia), expresado como divergencia KL. Un valor más alto indica más movimiento. La deriva también puede reflejar que la plataforma reentrena su propio modelo, no solo Fauxx, así que considérala un indicador, no una prueba.</string>
     <string name="dashboard_drift_collecting">recopilando…</string>
     <string name="dashboard_drift_no_profile">sin perfil publicitario</string>
+    <string name="dashboard_drift_not_imported">importa un perfil</string>
     <string name="dashboard_control_divergence_title">ENVENENADO FRENTE A CONTROL</string>
     <string name="dashboard_control_divergence_help">Divergencia KL entre tu perfil envenenado y un perfil de control importado (una cuenta limpia que nunca envenenas). Un valor más alto significa que Fauxx ha separado más ambos perfiles. Se muestra solo tras importar un perfil de control.</string>
     <string name="dashboard_synthetic_activity_title">ACTIVIDAD SINTÉTICA</string>

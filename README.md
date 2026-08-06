@@ -268,7 +268,7 @@ app/src/main/
 └── assets/
     ├── query_banks/                     # Query bank JSON per category
     ├── crawl_urls.json                  # 2,400+ categorized URLs
-    ├── user_agents.json                 # 275+ real User-Agent strings
+    ├── user_agents.json                 # 270+ real User-Agent strings
     ├── city_coords.json                 # 800+ city coordinates
     ├── blocklist.json                   # Blocked domains
     ├── demographic_distance_rules.json  # Category weight rules by demographic
