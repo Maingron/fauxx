@@ -289,4 +289,80 @@ class PoisonProfileRepositoryTest {
         val result = readBack()
         assertEquals(seeded.copy(enabled = true), result)
     }
+
+    // --- pre-#216 battery-threshold migration -------------------------------------------------
+    //
+    // #216 replaced the single `battery_threshold` slider (plus an "ignore it while charging"
+    // toggle) with two independent thresholds. Without a migration, everyone who had customised
+    // the old slider would silently be reset to the 20% default on update, and anyone relying on
+    // ignore-while-charging would start pausing while plugged in. These lock the carry-over.
+
+    /** Writes raw legacy keys, i.e. exactly what a pre-#216 install has on disk. */
+    private fun seedLegacy(threshold: Int? = null, ignoreWhileCharging: Boolean? = null) =
+        runBlocking {
+            dataStore.edit { prefs ->
+                threshold?.let { prefs[PreferenceKeys.BATTERY_THRESHOLD] = it }
+                ignoreWhileCharging?.let {
+                    prefs[PreferenceKeys.IGNORE_BATTERY_THRESHOLD_WHILE_CHARGING] = it
+                }
+            }
+        }
+
+    @Test
+    fun `a legacy threshold carries over to both new thresholds`() {
+        seedLegacy(threshold = 35)
+
+        val result = readBack()
+
+        assertEquals("on-battery must keep the old slider value", 35, result.batteryThresholdBattery)
+        assertEquals("charging must keep it too, matching old single-slider behavior", 35, result.batteryThresholdCharging)
+    }
+
+    @Test
+    fun `legacy ignore-while-charging becomes a charging threshold of zero`() {
+        // "Ignore the threshold while charging" means never pause for battery while plugged in,
+        // which is exactly a charging threshold of 0.
+        seedLegacy(threshold = 35, ignoreWhileCharging = true)
+
+        val result = readBack()
+
+        assertEquals(35, result.batteryThresholdBattery)
+        assertEquals("ignore-while-charging must map to 0, not the old threshold", 0, result.batteryThresholdCharging)
+    }
+
+    @Test
+    fun `an explicit ignore-while-charging of false keeps the legacy threshold on both sides`() {
+        seedLegacy(threshold = 45, ignoreWhileCharging = false)
+
+        val result = readBack()
+
+        assertEquals(45, result.batteryThresholdBattery)
+        assertEquals(45, result.batteryThresholdCharging)
+    }
+
+    @Test
+    fun `new thresholds win over legacy keys when both are present`() {
+        // A profile already migrated (or explicitly re-set by the user) must not be dragged back
+        // to the legacy value on every read.
+        seedLegacy(threshold = 35, ignoreWhileCharging = true)
+        runBlocking {
+            dataStore.edit { prefs ->
+                prefs[PreferenceKeys.BATTERY_THRESHOLD_BATTERY] = 15
+                prefs[PreferenceKeys.BATTERY_THRESHOLD_CHARGING] = 80
+            }
+        }
+
+        val result = readBack()
+
+        assertEquals(15, result.batteryThresholdBattery)
+        assertEquals(80, result.batteryThresholdCharging)
+    }
+
+    @Test
+    fun `a fresh install with no battery keys at all gets the defaults`() {
+        val result = readBack()
+
+        assertEquals(20, result.batteryThresholdBattery)
+        assertEquals(20, result.batteryThresholdCharging)
+    }
 }

@@ -101,15 +101,10 @@ class SettingsViewModel @Inject constructor(
     fun setIntensity(level: IntensityLevel) { update { it.copy(intensity = level) } }
     /** Null pauses on mobile data — the legacy "Wi-Fi only" behavior (issue #62). */
     fun setMobileIntensity(level: IntensityLevel?) { update { it.copy(mobileIntensity = level) } }
-    fun setBatteryThreshold(v: Int, t: BatteryThresholdType) {
-       	if(t == BatteryThresholdType.BATTERY) {
-            update {
-               	it.copy(batteryThresholdBattery = v)
-            }
-        } else {
-            update {
-               	it.copy(batteryThresholdCharging = v)
-            }
+    fun setBatteryThreshold(v: Int, t: BatteryThresholdType) = update {
+        when (t) {
+            BatteryThresholdType.BATTERY -> it.copy(batteryThresholdBattery = v)
+            BatteryThresholdType.CHARGING -> it.copy(batteryThresholdCharging = v)
         }
     }
 
