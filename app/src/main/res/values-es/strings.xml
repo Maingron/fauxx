@@ -20,11 +20,11 @@
 
     <!-- Onboarding -->
     <string name="onboarding_title">FAUXX</string>
-    <string name="onboarding_subtitle">Privacidad mediante ruido</string>
+    <string name="onboarding_subtitle">Privacidad mediante engaño</string>
     <string name="onboarding_intro">Fauxx protege tu privacidad generando actividad de navegación sintética en segundo plano. Esto es lo que hace:</string>
     <string name="onboarding_bullet_search">Realiza búsquedas web en Google, Bing, DuckDuckGo y Yahoo sobre temas variados</string>
     <string name="onboarding_bullet_browse">Visita una amplia variedad de sitios web para diversificar tu perfil de navegación</string>
-    <string name="onboarding_bullet_fingerprint">Rota las huellas del navegador (User-Agent, cabeceras de idioma)</string>
+    <string name="onboarding_bullet_fingerprint">Presenta una identidad de dispositivo estable por persona (User-Agent, client hints)</string>
     <string name="onboarding_bullet_dns">Genera consultas DNS hacia distintos dominios</string>
     <string name="onboarding_bullet_battery">Toda la actividad se ejecuta en segundo plano y consume batería y datos</string>
     <string name="onboarding_optional_profile">Si quieres, cuéntanos algo sobre ti en las pantallas siguientes. Esta información se queda en tu dispositivo y nos ayuda a generar ruido distinto al de tu perfil real. Sáltatelo si prefieres ruido uniforme.</string>
@@ -54,7 +54,7 @@
     <string name="consent_intro">Fauxx realizará las siguientes actividades en segundo plano:</string>
     <string name="consent_bullet_search">Buscar temas variados en Google, Bing, DuckDuckGo y Yahoo</string>
     <string name="consent_bullet_browse">Visitar una variedad de sitios web para ampliar tu perfil de navegación</string>
-    <string name="consent_bullet_fingerprint">Rotar huellas del navegador (User-Agent, cabeceras de idioma)</string>
+    <string name="consent_bullet_fingerprint">Presentar una identidad de dispositivo estable por persona (User-Agent, client hints)</string>
     <string name="consent_bullet_dns">Generar consultas DNS hacia dominios variados</string>
     <string name="consent_bullet_battery">Usar batería y datos móviles mientras se ejecuta en segundo plano</string>
     <string name="consent_footer">Toda la actividad es sintética y permanece en tu dispositivo. No se recopila ni se transmite ningún dato personal.</string>
@@ -272,8 +272,8 @@
     <string name="module_cookie_description">Visita más de 10 000 URL en segundo plano para acumular cookies de rastreo variadas</string>
     <string name="module_dns_name">Ruido de DNS</string>
     <string name="module_dns_description">Resuelve dominios variados para generar ruido de consultas DNS visible para el ISP</string>
-    <string name="module_fingerprint_name">Rotación de huella</string>
-    <string name="module_fingerprint_description">Rota User-Agent, ruido de canvas y propiedades del navegador</string>
+    <string name="module_fingerprint_name">Identidad del dispositivo</string>
+    <string name="module_fingerprint_description">Presenta un dispositivo estable por persona (User-Agent, client hints, navigator) más ruido de canvas</string>
     <string name="module_ad_name">Contaminación publicitaria</string>
     <string name="module_ad_description">Carga páginas saturadas de anuncios y visita paneles de preferencias publicitarias</string>
     <string name="module_location_name">Suplantación de ubicación</string>
@@ -494,6 +494,7 @@
     <string name="dashboard_drift_help">Cuánto se ha alejado tu perfil de intereses publicitarios importado desde la primera importación (de referencia), expresado como divergencia KL. Un valor más alto indica más movimiento. La deriva también puede reflejar que la plataforma reentrena su propio modelo, no solo Fauxx, así que considérala un indicador, no una prueba.</string>
     <string name="dashboard_drift_collecting">recopilando…</string>
     <string name="dashboard_drift_no_profile">sin perfil publicitario</string>
+    <string name="dashboard_drift_not_imported">importa un perfil</string>
     <string name="dashboard_control_divergence_title">ENVENENADO FRENTE A CONTROL</string>
     <string name="dashboard_control_divergence_help">Divergencia KL entre tu perfil envenenado y un perfil de control importado (una cuenta limpia que nunca envenenas). Un valor más alto significa que Fauxx ha separado más ambos perfiles. Se muestra solo tras importar un perfil de control.</string>
     <string name="dashboard_synthetic_activity_title">ACTIVIDAD SINTÉTICA</string>

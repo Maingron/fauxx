@@ -41,7 +41,11 @@ class ModuleSilentFailureTest {
     val mainDispatcherRule = MainDispatcherRule(testDispatcher)
 
     private val webView: WebView = mockk(relaxed = true)
-    private val webViewPool: PhantomWebViewPool = mockk(relaxed = true)
+    // #268: modules now consult lastLoadError() to decide success. A relaxed mock would hand back
+    // a non-null string, i.e. "this load failed", so the clean-load default has to be explicit.
+    private val webViewPool: PhantomWebViewPool = mockk<PhantomWebViewPool>(relaxed = true).apply {
+        every { lastLoadError(any()) } returns null
+    }
     private val crawlListManager: CrawlListManager = mockk(relaxed = true)
     private val profileRepo: PoisonProfileRepository = mockk(relaxed = true)
 
@@ -100,6 +104,23 @@ class ModuleSilentFailureTest {
 
         assertTrue("Should report success on normal load", result.success)
     }
+
+    @Test
+    fun `CookieSaturationModule reports failure when the main frame fails to load`() =
+        runTest(testDispatcher) {
+            // #268: the load does not throw — a DNS-blocked host (Pi-hole and friends, which most
+            // Fauxx users run) resolves to an error page that "finishes" loading normally. The only
+            // signal is the main-frame error the WebViewClient records, so a module that ignores it
+            // logs a Success line for a page that never loaded.
+            every { profileRepo.getProfile() } returns PoisonProfile(cookieSaturationEnabled = true)
+            every { crawlListManager.nextUrlOrWait(any()) } returns testEntry
+            every { webViewPool.lastLoadError(any()) } returns "net(-2): net::ERR_NAME_NOT_RESOLVED"
+
+            val module = CookieSaturationModule(crawlListManager, webViewPool, profileRepo)
+            val result = module.onAction(CategoryPool.GAMING)
+
+            assertFalse("A main-frame load error must be reported as a failed action", result.success)
+        }
 
     @Test
     fun `AdPollutionModule visits ad dashboard as PAGE_VISIT without consulting crawl list`() =

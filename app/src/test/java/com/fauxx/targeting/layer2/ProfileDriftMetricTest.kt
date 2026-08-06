@@ -25,9 +25,19 @@ class ProfileDriftMetricTest {
 
     @Test
     fun `collecting until two snapshots exist for a platform`() {
-        assertEquals(DriftState.COLLECTING, metric.compute(emptyList()).state)
         val r = metric.compute(listOf(snap("google", listOf("GAMING"), 1)))
         assertEquals(DriftState.COLLECTING, r.state)
+        assertNull(r.klDivergence)
+    }
+
+    @Test
+    fun `no imports at all reports NOT_IMPORTED not collecting`() {
+        // #275: drift is computed from imported profile snapshots, so with zero imports it can
+        // never advance. Reporting COLLECTING told users to wait for something that would never
+        // arrive, and the dashboard sat on "collecting…" indefinitely. The two states need
+        // opposite things from the user: COLLECTING resolves by waiting, NOT_IMPORTED by importing.
+        val r = metric.compute(emptyList())
+        assertEquals(DriftState.NOT_IMPORTED, r.state)
         assertNull(r.klDivergence)
     }
 

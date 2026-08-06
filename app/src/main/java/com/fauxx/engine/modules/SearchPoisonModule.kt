@@ -338,9 +338,20 @@ class SearchPoisonModule @Inject constructor(
         dwellMs: LongRange,
     ): Boolean = try {
         withTimeoutOrNull(SEARCH_LOAD_TIMEOUT_MS) {
+            // #268: clear before navigating so this reflects THIS load, not an earlier
+            // refinement's failure on the same acquired WebView.
+            webViewPool.clearLoadError(webView)
             withContext(Dispatchers.Main) { webView.loadUrl(url, headers) }
             delay(random.nextLong(dwellMs.first, dwellMs.last + 1))
-            true
+            // #268: a DNS-blocked or refused load still "finishes" — on an error page. Treat a
+            // main-frame error as a failed load instead of reporting the action as a success.
+            val loadError = webViewPool.lastLoadError(webView)
+            if (loadError != null) {
+                Timber.d("Search load failed [$loadError]")
+                false
+            } else {
+                true
+            }
         } ?: false
     } catch (e: kotlinx.coroutines.CancellationException) {
         throw e

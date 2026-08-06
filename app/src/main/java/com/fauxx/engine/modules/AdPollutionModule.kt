@@ -88,7 +88,11 @@ class AdPollutionModule @Inject constructor(
                 delay(random.nextLong(3_000L, 15_000L))
                 // #73: read page metadata on Main, before release() wipes the document.
                 metadata = withContext(Dispatchers.Main) { webViewPool.captureMetadata(webView, url) }
-                true
+                // #268: an error page still "finishes" loading. A main-frame failure (DNS blocked,
+                // refused, HTTP 4xx/5xx) is not a successful visit, so don't log it as one.
+                val loadError = webViewPool.lastLoadError(webView)
+                if (loadError != null) Timber.d("Ad page load failed [$loadError]")
+                loadError == null
             } catch (e: Exception) {
                 Timber.w("Ad page load failed: ${e.message}")
                 false

@@ -9,13 +9,17 @@ import kotlin.math.ln
 
 /**
  * Whether a drift number can be shown yet (issue #171 E2).
+ *  - [NOT_IMPORTED]: the user has never imported an ad profile, so drift cannot start. Drift is
+ *    computed from imported snapshots, not from Fauxx's own activity, so with zero imports it can
+ *    never progress. Distinguished from COLLECTING because the two need opposite things from the
+ *    user: COLLECTING resolves by waiting, NOT_IMPORTED resolves only by importing (#275).
  *  - [COLLECTING]: a profile exists but not enough snapshots to compute drift (needs a second).
  *  - [AVAILABLE]: a drift value is computed.
  *  - [NO_PROFILE]: the user has imported a profile but it is empty — e.g. personalized ads are
  *    turned off, so there is no ad profile to track. Distinguished from COLLECTING so the
  *    dashboard can say so instead of showing "collecting…" forever (#220).
  */
-enum class DriftState { COLLECTING, AVAILABLE, NO_PROFILE }
+enum class DriftState { NOT_IMPORTED, COLLECTING, AVAILABLE, NO_PROFILE }
 
 /** Result of the profile-drift computation; [klDivergence] is null unless [state] is AVAILABLE. */
 data class DriftResult(val state: DriftState, val klDivergence: Double?)
@@ -35,6 +39,12 @@ class ProfileDriftMetric @Inject constructor() {
     private val gson = Gson()
 
     fun compute(snapshots: List<ProfileSnapshot>): DriftResult {
+        // Nothing imported at all: drift is derived from imported profile snapshots, so it can
+        // never advance on its own. Reporting COLLECTING here (as this did before #275) told users
+        // to wait for something that was never going to happen — the dashboard sat on "collecting…"
+        // indefinitely for anyone who had not used the Layer 2 profile import.
+        if (snapshots.isEmpty()) return DriftResult(DriftState.NOT_IMPORTED, null)
+
         // If the user has imported at least one profile but the latest snapshot for every platform
         // is empty, there is simply no ad profile to track (e.g. Google personalized ads turned
         // off). Report NO_PROFILE so the dashboard can explain that, rather than sitting on

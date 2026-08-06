@@ -5,7 +5,9 @@ import android.net.http.SslError
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.SafeBrowsingResponse
 import android.webkit.SslErrorHandler
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import com.fauxx.data.crawllist.DomainBlocklist
 import java.util.concurrent.atomic.AtomicInteger
@@ -231,5 +233,100 @@ class PhantomWebViewClientTest {
         client.onPageFinished(view, "https://good.com/done")
 
         assertEquals("the callback must receive the finished url", "https://good.com/done", captured)
+    }
+
+    // --- main-frame load errors (#268) -----------------------------------------
+
+    private fun mainFrameRequest(url: String, isMainFrame: Boolean): WebResourceRequest {
+        val req: WebResourceRequest = mockk()
+        every { req.url } returns Uri.parse(url)
+        every { req.isForMainFrame } returns isMainFrame
+        return req
+    }
+
+    private fun netError(code: Int, description: String): WebResourceError {
+        val err: WebResourceError = mockk()
+        every { err.errorCode } returns code
+        every { err.description } returns description
+        return err
+    }
+
+    @Test
+    fun `a main-frame network error is reported`() {
+        // The #268 case: a DNS-blocked host (Pi-hole and friends) fails at the network layer, the
+        // WebView shows an error page, and the module used to log the action as a success anyway.
+        var reported: String? = null
+        val client = PhantomWebViewClient(blocklist, onMainFrameError = { reported = it })
+
+        client.onReceivedError(
+            view,
+            mainFrameRequest("https://blocked.example/", isMainFrame = true),
+            netError(-2, "net::ERR_NAME_NOT_RESOLVED"),
+        )
+
+        assertNotNull("a main-frame failure must be reported", reported)
+        assertTrue(
+            "the report should carry the underlying cause, got: $reported",
+            reported!!.contains("ERR_NAME_NOT_RESOLVED"),
+        )
+    }
+
+    @Test
+    fun `a sub-resource network error is ignored`() {
+        // Sub-resource failures are routine on real pages (a blocked tracker is in fact the
+        // desired outcome) and say nothing about whether the visit itself worked.
+        var reported: String? = null
+        val client = PhantomWebViewClient(blocklist, onMainFrameError = { reported = it })
+
+        client.onReceivedError(
+            view,
+            mainFrameRequest("https://tracker.example/px.gif", isMainFrame = false),
+            netError(-2, "net::ERR_NAME_NOT_RESOLVED"),
+        )
+
+        assertNull("a sub-resource failure must not fail the action", reported)
+    }
+
+    @Test
+    fun `a main-frame HTTP error status is reported`() {
+        var reported: String? = null
+        val client = PhantomWebViewClient(blocklist, onMainFrameError = { reported = it })
+        val response: WebResourceResponse = mockk()
+        every { response.statusCode } returns 503
+
+        client.onReceivedHttpError(
+            view,
+            mainFrameRequest("https://down.example/", isMainFrame = true),
+            response,
+        )
+
+        assertNotNull("a main-frame 5xx must be reported", reported)
+        assertTrue("the report should name the status, got: $reported", reported!!.contains("503"))
+    }
+
+    @Test
+    fun `a sub-resource HTTP error is ignored`() {
+        var reported: String? = null
+        val client = PhantomWebViewClient(blocklist, onMainFrameError = { reported = it })
+        val response: WebResourceResponse = mockk()
+        every { response.statusCode } returns 404
+
+        client.onReceivedHttpError(
+            view,
+            mainFrameRequest("https://cdn.example/missing.png", isMainFrame = false),
+            response,
+        )
+
+        assertNull("a sub-resource 404 must not fail the action", reported)
+    }
+
+    @Test
+    fun `errors are tolerated with no callback wired`() {
+        val client = PhantomWebViewClient(blocklist)
+        client.onReceivedError(
+            view,
+            mainFrameRequest("https://blocked.example/", isMainFrame = true),
+            netError(-2, "net::ERR_NAME_NOT_RESOLVED"),
+        )
     }
 }

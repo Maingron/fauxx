@@ -14,6 +14,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import com.fauxx.data.crawllist.DomainBlocklist
+import com.fauxx.data.device.DeviceProfile
 import java.util.concurrent.atomic.AtomicInteger
 
 /** MIME types that should not be loaded in background WebViews. */
@@ -39,14 +40,23 @@ class PhantomWebViewClient(
     // Issue #210: invoked with the affected WebView when its renderer process dies, so the pool
     // can destroy the broken instance and swap in a fresh one. onRenderProcessGone ALWAYS returns
     // true regardless, so Android never terminates the whole app process on a renderer death.
-    private val onRenderGone: ((WebView) -> Unit)? = null
+    private val onRenderGone: ((WebView) -> Unit)? = null,
+    // Issue #242: supplies the active persona's device at injection time, so the navigator
+    // overrides (hardwareConcurrency/deviceMemory) match the persona's stable device rather than
+    // being per-read random. Read per navigation so a persona rotation is reflected on the next load.
+    private val deviceProvider: () -> DeviceProfile? = { null },
+    // Issue #268: invoked with a short description when the MAIN FRAME fails to load (DNS failure,
+    // connection refused, HTTP 4xx/5xx). Without this the failure was logged and dropped, and the
+    // module still recorded the action as a success — a DNS-blocked load (Pi-hole and friends,
+    // which most Fauxx users run) produced an error page but a "Success" action-log line.
+    private val onMainFrameError: ((String) -> Unit)? = null
 ) : WebViewClient() {
 
     override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
         super.onPageStarted(view, url, favicon)
         // On high-scrutiny endpoints (search engines) inject only the benign GPC signal;
         // the automation-shaped overrides are themselves a detection tell there (#168/#169).
-        val scripts = if (isHighScrutiny(url)) JSInjector.MINIMAL_SCRIPTS else JSInjector.ALL_SCRIPTS
+        val scripts = if (isHighScrutiny(url)) JSInjector.MINIMAL_SCRIPTS else JSInjector.allScripts(deviceProvider())
         view.evaluateJavascript(scripts) { result ->
             if (result != null && result != "null" && result.contains("error", ignoreCase = true)) {
                 Timber.w("JS injection may have failed on $url: $result")
@@ -98,6 +108,26 @@ class PhantomWebViewClient(
         val description = error?.description ?: "unknown error"
         val code = error?.errorCode ?: 0
         Timber.w("WebView load error on ${request.url} (code=$code): $description")
+        onMainFrameError?.invoke("net($code): $description")
+    }
+
+    /**
+     * Issue #268: an HTTP error status on the main frame is a failed load too. The server answered,
+     * so [onReceivedError] does not fire, but the page the module dwelled on is an error page, not
+     * the content it meant to visit. Sub-resource 4xx/5xx are ignored — those are routine on real
+     * pages and say nothing about whether the visit itself worked.
+     */
+    override fun onReceivedHttpError(
+        view: WebView,
+        request: WebResourceRequest?,
+        errorResponse: WebResourceResponse?
+    ) {
+        super.onReceivedHttpError(view, request, errorResponse)
+        if (request?.isForMainFrame != true) return
+        val status = errorResponse?.statusCode ?: return
+        if (status < 400) return
+        Timber.w("WebView HTTP error on ${request.url}: $status")
+        onMainFrameError?.invoke("http($status)")
     }
 
     override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {

@@ -45,8 +45,9 @@ class SyncListener @Inject constructor(
 
     /**
      * Bind [port] (all interfaces) and run the accept loop on [scope]. Idempotent: a second call
-     * while already running is a no-op. [onPersona] is invoked after a synced persona is persisted
-     * (a transparency hook for the UI; persistence is the gate, not this callback).
+     * while already running is a no-op. [onPersona] is invoked after a synced persona is persisted;
+     * the sync session wires it to adopt the persona as the active one (#234) and to surface a
+     * transparency notice. Persistence happens unconditionally here regardless of the callback.
      */
     @Synchronized
     fun start(
@@ -124,8 +125,10 @@ class SyncListener @Inject constructor(
             val (peer, message) = opened
             when (val body = message.body) {
                 is SyncBody.PersonaUpsert -> {
+                    // Persist unconditionally (the transparency gate); onPersona then drives
+                    // adoption of the persona as active (#234). Adoption is logged separately.
                     syncPersonaStore.upsert(body.persona)
-                    Timber.i("LAN sync: applied synced persona %s from %s", body.persona.id, peer.fingerprint)
+                    Timber.i("LAN sync: persisted synced persona %s from %s", body.persona.id, peer.fingerprint)
                     onPersona(body.persona, peer)
                 }
             }

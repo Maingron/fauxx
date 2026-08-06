@@ -270,7 +270,11 @@ class AppSignalModule @Inject constructor(
                 delay(dwellMs)
                 // #73: read page metadata on Main, before release() wipes the document.
                 metadata = withContext(Dispatchers.Main) { webViewPool.captureMetadata(webView, url) }
-                true
+                // #268: an error page still "finishes" loading. A main-frame failure (DNS blocked,
+                // refused, HTTP 4xx/5xx) is not a successful visit, so don't log it as one.
+                val loadError = webViewPool.lastLoadError(webView)
+                if (loadError != null) Timber.d("App signal load failed [$loadError]")
+                loadError == null
             } catch (e: Exception) {
                 Timber.w("App signal load failed: ${e.message}")
                 false

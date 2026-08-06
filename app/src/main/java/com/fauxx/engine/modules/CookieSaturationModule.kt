@@ -78,7 +78,11 @@ class CookieSaturationModule @Inject constructor(
                 delay(dwellMs)
                 // #73: read page metadata on Main, before release() wipes the document.
                 metadata = withContext(Dispatchers.Main) { webViewPool.captureMetadata(webView, entry.url) }
-                true
+                // #268: an error page still "finishes" loading. A main-frame failure (DNS blocked,
+                // refused, HTTP 4xx/5xx) is not a successful visit, so don't log it as one.
+                val loadError = webViewPool.lastLoadError(webView)
+                if (loadError != null) Timber.d("Cookie harvest load failed [$loadError]")
+                loadError == null
             } catch (e: Exception) {
                 Timber.w("Failed to load ${entry.url}: ${e.message}")
                 false
